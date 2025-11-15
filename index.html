@@ -191,11 +191,9 @@
                     const imageUrl = article.thumbnail;
 
                     articleEl.innerHTML = `
-                        <!-- CAMBIO: Usamos la 'thumbnail' o el placeholder -->
                         <img src="${imageUrl || 'https://placehold.co/600x400/374151/FFFFFF?text=Salud'}" alt="Imagen de la noticia" class="w-full h-48 object-cover" onerror="this.src='https://placehold.co/600x400/374151/FFFFFF?text=Salud'; this.onerror=null;">
                         
                         <div class="p-6">
-                            <!-- CAMBIO: El enlace ahora es 'article.link' -->
                             <h2 class="text-2xl font-bold mb-2">
                                 <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="hover:text-kidshealth-green transition duration-300">
                                     ${article.title}
