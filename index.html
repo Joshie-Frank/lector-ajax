@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lector de Noticias con AJAX</title>
+    <!-- Google Font (Poppins) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Configuración de Tailwind -->
+    <script>
+        tailwind.config = {
+          theme: {
+            extend: {
+              colors: {
+                // color verde 
+                'kidshealth-green': '#008373', 
+              },
+              fontFamily: {
+                'sans': ['Poppins', 'sans-serif'],
+              }
+            }
+          }
+        }
+      </script>
+    <style>
+        /* Estilo para el estado de carga */
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .loader {
+            border: 4px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #3498db;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        /* Estilos para el contenedor principal y tarjetas */
+        body {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .card {
+            /* Sombra y bordes redondeados */
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+    </style>
+</head>
+<body class="bg-white text-gray-900 min-h-screen">
+
+    <!-- Encabezado de la aplicación -->
+    <header class="bg-kidshealth-green shadow-md">
+        <div class="container mx-auto px-4 py-6 flex justify-between items-center">
+            <h1 class="text-3xl font-bold text-white">Lector de Noticias AJAX</h1>
+            <!-- Botón para refrescar las noticias -->
+            <button id="refresh-btn" class="bg-white hover:bg-gray-100 text-kidshealth-green font-bold py-2 px-4 rounded-lg flex items-center transition duration-300 ease-in-out">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101A7.002 7.002 0 0112 4c2.52 0 4.74 1.22 6.18 3.12A.75.75 0 1117.1 8.01 5.502 5.502 0 0012 5.5 5.5 5.5 0 006.5 11H9a1 1 0 110 2H4a1 1 0 01-1-1V7a1 1 0 112 0v1.393A7.001 7.001 0 0112 11.5c.983 0 1.906-.206 2.72-.563a.75.75 0 11.56 1.332A8.502 8.502 0 0112 13.5a8.5 8.5 0 01-8.5-8.5A8.5 8.5 0 0112 2.5c2.315 0 4.428.918 5.98 2.399a.75.75 0 11-1.06 1.06A7.001 7.001 0 0012 4a7 7 0 00-7 7H2.5a.75.75 0 01-.75-.75V7a.75.75 0 011.5 0v2.25H4a1 1 0 011 1v.101z" clip-rule="evenodd" />
+                </svg>
+                Refrescar
+            </button>
+        </div>
+    </header>
+
+    <!-- Cuerpo principal donde se mostrarán las noticias -->
+    <main class="container mx-auto p-4">
+        <!-- Área específica para las noticias -->
+        <div id="news-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Las noticias se insertarán aquí dinámicamente -->
+        </div>
+
+        <!-- Contenedor para mensajes (carga y error) -->
+        <div id="message-container" class="text-center py-10"></div>
+    </main>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const newsContainer = document.getElementById('news-container');
+            const messageContainer = document.getElementById('message-container');
+            const refreshBtn = document.getElementById('refresh-btn');
+
+            // URL de la API (rss2json, que maneja CORS, pero con un feed de BBC Mundo Salud)
+            const API_URL = 'https://api.rss2json.com/v1/api.json?rss_url=http%3A%2F%2Ffeeds.bbci.co.uk%2Fmundo%2Ftemas%2Fsalud%2Frss.xml';
+
+            /**
+             * Muestra un mensaje de carga o error.
+             * @param {string} type - 'loading', 'error', o 'clear'
+             * @param {string} [message] - El mensaje a mostrar (para 'error')
+             */
+            function showMessage(type, message = '') {
+                newsContainer.innerHTML = ''; // Limpiar noticias
+                
+                if (type === 'loading') {
+                    messageContainer.innerHTML = `
+                        <div class="flex justify-center items-center">
+                    <div class="loader mr-3"></div>
+                    <span class="text-lg text-gray-700">Cargando noticias...</span>
+                </div>
+            `;
+                } else if (type === 'error') {
+                    messageContainer.innerHTML = `
+                        <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg" role="alert">
+                            <strong class="font-bold">Error:</strong>
+                            <span class="block sm:inline">${message}</span>
+                        </div>
+                    `;
+                } else if (type === 'clear') {
+                    messageContainer.innerHTML = '';
+                }
+            }
+
+            /**
+             * Limpia etiquetas HTML de un string para mostrar un resumen limpio.
+             * @param {string} html - El string con HTML.
+             * @returns {string} - El texto plano.
+             */
+            function stripHtml(html) {
+                if (!html) return ""; // Manejar casos donde html es nulo o undefined
+                const tempDiv = document.createElement("div");
+                tempDiv.innerHTML = html;
+                // Devuelve el texto o una cadena vacía si no hay nada
+                return (tempDiv.textContent || tempDiv.innerText || "").trim();
+            }
+
+            /**
+             * (Función extractImageUrl eliminada ya que rss2json nos da 'thumbnail')
+             */
+
+            /**
+             * Obtiene y muestra las noticias usando Fetch (AJAX)
+             */
+            async function fetchNews() {
+                showMessage('loading'); // Mostrar indicador de carga
+
+                try {
+  
+                    const response = await fetch(API_URL);
+
+                    // Manejo de errores HTTP (ej. 404, 500)
+                    if (!response.ok) {
+                        throw new Error(`Error de red: ${response.status} - ${response.statusText}`);
+                    }
+
+                    const data = await response.json();
+
+                    // Manejo de caso donde la API responde bien pero no hay noticias
+                    if (data.status !== 'ok' || !data.items || data.items.length === 0) {
+                        throw new Error('No se encontraron noticias disponibles.');
+                    }
+
+                    // Si todo está bien, limpiamos los mensajes
+                    showMessage('clear');
+                    // Pasamos los artículos (items) y el título del feed (fuente)
+                    displayNews(data.items, data.feed.title); 
+
+                } catch (error) {
+                    // Manejo de errores 
+                    console.error('Error al obtener noticias:', error);
+                    showMessage('error', error.message || 'No se pudieron cargar las noticias.');
+                }
+            }
+
+            /**
+             * Procesa el array de noticias y las muestra en el HTML
+             * @param {Array} articles - El array de artículos de noticias
+             * @param {string} feedTitle - El título del feed (fuente de las noticias)
+             */
+            function displayNews(articles, feedTitle) {
+                newsContainer.innerHTML = ''; // Limpiar contenedor por si acaso
+
+                articles.forEach(article => {
+                    // Creamos la tarjeta para cada noticia
+                    const articleEl = document.createElement('article');
+                    articleEl.className = 'card bg-white rounded-lg shadow-md overflow-hidden';
+                    
+                    const formattedDate = new Date(article.pubDate).toLocaleDateString('es-ES', {
+                        year: 'numeric', month: 'long', day: 'numeric'
+                    });
+
+                    const summary = stripHtml(article.description).substring(0, 140) + '...';
+
+                    const imageUrl = article.thumbnail;
+
+                    articleEl.innerHTML = `
+                        <!-- CAMBIO: Usamos la 'thumbnail' o el placeholder -->
+                        <img src="${imageUrl || 'https://placehold.co/600x400/374151/FFFFFF?text=Salud'}" alt="Imagen de la noticia" class="w-full h-48 object-cover" onerror="this.src='https://placehold.co/600x400/374151/FFFFFF?text=Salud'; this.onerror=null;">
+                        
+                        <div class="p-6">
+                            <!-- CAMBIO: El enlace ahora es 'article.link' -->
+                            <h2 class="text-2xl font-bold mb-2">
+                                <a href="${article.link}" target="_blank" rel="noopener noreferrer" class="hover:text-kidshealth-green transition duration-300">
+                                    ${article.title}
+                                </a>
+                            </h2>
+                            <p class="text-gray-700 mb-4">${summary}</p>
+                            <div class="text-sm text-gray-500">
+                                <span>${formattedDate}</span>
+                                <span class="mx-2">|</span>
+                                <span>${feedTitle}</span>
+                            </div>
+                        </div>
+                    `;
+                    newsContainer.appendChild(articleEl);
+                });
+            }
+
+            // --- Event Listeners ---
+
+            // Cargar noticias al iniciar la página
+            fetchNews();
+
+            // Cargar noticias al hacer clic en el botón "Refrescar"
+            refreshBtn.addEventListener('click', fetchNews);
+        });
+    </script>
+</body>
+</html>
